@@ -20,6 +20,6 @@ for item, directory in zip([input_set, output_set], ['./inputs', './outputs']):
     for link in links:
         print(link)
         print(link.split('/')[-1])
-        f = open('./inputs/' + link.split('/')[-1], 'wb')
+        f = open(directory + '/' + link.split('/')[-1], 'wb')
         f.write(urlopen(link).read())
         f.close()
