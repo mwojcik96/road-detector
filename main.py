@@ -5,6 +5,7 @@ import os
 import cv2
 import numpy as np
 from keras import losses
+from keras.callbacks import LearningRateScheduler
 from keras.losses import binary_crossentropy
 from keras.optimizers import SGD
 
@@ -62,16 +63,23 @@ def file_list(in_directory, out_directory):
     output_list = [out_directory + "/" + file.split("/")[-1][:-1] for file in input_list]
     return input_list, output_list
 
-batch_per_img = 100
-images_for_batch = 1
+batch_per_img = 5
+images_for_batch = 720
 img_size = 1500
 input_size = 128  # FCN input element width and height
 input_directory = './input_train'
 output_directory = './output_train'
 weight_decay = 1e-3
-resume_training = False
 save_path = './model'
 training = True
+epochs = 50
+epochs_per_batch = 1
+
+def lr_scheduler(epoch):
+    lr = lr_base * ((1 - float(epoch) / epochs) ** 0.9)
+    print('lr: %f' % lr)
+    return lr
+
 
 if __name__ == "__main__":
 
@@ -83,10 +91,6 @@ if __name__ == "__main__":
     model.compile(loss=losses.mean_squared_error, optimizer=optimizer)
 
     if training:
-        if resume_training:
-            checkpoint_path = os.path.join(save_path, 'checkpoint_weights.hdf5')
-            model.load_weights(checkpoint_path, by_name=True)
-
         model_path = os.path.join(save_path, "model.json")
         # save model structure
         f = open(model_path, 'w')
@@ -98,7 +102,10 @@ if __name__ == "__main__":
 
         x, y = prepare_batch(input_directory, output_directory, images_for_batch, batch_per_img)
 
-        model.fit(x, y, batch_size=8, epochs=5)
+        scheduler = LearningRateScheduler(lr_scheduler)
+        callbacks = [scheduler]
+
+        model.fit(x, y, batch_size=8, epochs=epochs, callbacks=callbacks)
 
         model.save_weights(save_path + '/model.hdf5')
 
@@ -107,8 +114,10 @@ if __name__ == "__main__":
         y_pred = model.predict(x)
         for xx, yy, zz in zip(x, y, y_pred):
             minn, maxx = np.percentile(np.squeeze(zz), [2, 98])
+            print(minn, maxx)
             zz = (zz - minn) / (maxx - minn)
             cv2.imshow("x", np.squeeze(xx))
             cv2.imshow("y_true", np.squeeze(yy))
             cv2.imshow("y_pred", np.squeeze(zz))
+            cv2.imshow("y_pred_t", np.where(np.squeeze(zz) > 0.75, 0.33, 0.0) + np.where(np.squeeze(zz) > 0.5, 0.33, 0.0) + np.where(np.squeeze(zz) > 0.25, 0.33, 0.0))
             cv2.waitKey(0)
