@@ -4,10 +4,11 @@ import os
 
 import cv2
 import numpy as np
+from keras import losses
 from keras.losses import binary_crossentropy
 from keras.optimizers import SGD
 
-from model import FCN_Vgg8_32s
+from model import AtrousFCN_Vgg16_16s
 
 def prepare_batch(input_dir, output_dir, img_for_batch=1, batch_p_img=1):
     input_list, output_list = file_list(input_dir, output_dir)
@@ -62,39 +63,52 @@ def file_list(in_directory, out_directory):
     return input_list, output_list
 
 batch_per_img = 100
-images_for_batch = 10
+images_for_batch = 1
 img_size = 1500
 input_size = 128  # FCN input element width and height
 input_directory = './input_train'
 output_directory = './output_train'
-weight_decay = 1e-4
+weight_decay = 1e-3
 resume_training = False
 save_path = './model'
+training = True
 
 if __name__ == "__main__":
 
-    model = FCN_Vgg8_32s(input_shape=(input_size, input_size, 3), weight_decay=weight_decay, classes=1)
+    model = AtrousFCN_Vgg16_16s(input_shape=(input_size, input_size, 3), weight_decay=weight_decay, classes=1)
     print(model.summary())
     lr_base = 0.01 * (float(batch_per_img * images_for_batch) / 16)
     optimizer = SGD(lr=lr_base, momentum=0.9)
 
-    model.compile(loss=binary_crossentropy, optimizer=optimizer)
+    model.compile(loss=losses.mean_squared_error, optimizer=optimizer)
 
-    if resume_training:
-        checkpoint_path = os.path.join(save_path, 'checkpoint_weights.hdf5')
-        model.load_weights(checkpoint_path, by_name=True)
+    if training:
+        if resume_training:
+            checkpoint_path = os.path.join(save_path, 'checkpoint_weights.hdf5')
+            model.load_weights(checkpoint_path, by_name=True)
 
-    model_path = os.path.join(save_path, "model.json")
-    # save model structure
-    f = open(model_path, 'w')
-    model_json = model.to_json()
-    f.write(model_json)
-    f.close()
+        model_path = os.path.join(save_path, "model.json")
+        # save model structure
+        f = open(model_path, 'w')
+        model_json = model.to_json()
+        f.write(model_json)
+        f.close()
 
-    print(model.summary())
+        print(model.summary())
 
-    x, y = prepare_batch(input_directory, output_directory, images_for_batch, batch_per_img)
+        x, y = prepare_batch(input_directory, output_directory, images_for_batch, batch_per_img)
 
-    model.fit(x, y, batch_size=16, epochs=25)
+        model.fit(x, y, batch_size=8, epochs=5)
 
-    model.save_weights(save_path + '/model.hdf5')
+        model.save_weights(save_path + '/model.hdf5')
+
+    else:
+        x, y = prepare_batch('./input_test', './output_test', images_for_batch, batch_per_img)
+        y_pred = model.predict(x)
+        for xx, yy, zz in zip(x, y, y_pred):
+            minn, maxx = np.percentile(np.squeeze(zz), [2, 98])
+            zz = (zz - minn) / (maxx - minn)
+            cv2.imshow("x", np.squeeze(xx))
+            cv2.imshow("y_true", np.squeeze(yy))
+            cv2.imshow("y_pred", np.squeeze(zz))
+            cv2.waitKey(0)
