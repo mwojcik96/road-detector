@@ -8,6 +8,7 @@ from keras import losses
 from keras.callbacks import LearningRateScheduler
 from keras.losses import binary_crossentropy
 from keras.optimizers import SGD
+import keras.backend as K
 
 from model import AtrousFCN_Vgg16_16s
 
@@ -41,7 +42,7 @@ def prepare_batch(input_dir, output_dir, img_for_batch=1, batch_p_img=1):
     return x, y
 
 
-def iou_lf(y_true, y_pred):
+def iou_lf(y_pred, y_true):
     print(y_true, y_pred)
     true_img = y_true > 0.5
     pred_img = y_pred > 0.5
@@ -63,8 +64,8 @@ def file_list(in_directory, out_directory):
     output_list = [out_directory + "/" + file.split("/")[-1][:-1] for file in input_list]
     return input_list, output_list
 
-batch_per_img = 5
-images_for_batch = 720
+batch_per_img = 10
+images_for_batch = 10
 img_size = 1500
 input_size = 128  # FCN input element width and height
 input_directory = './input_train'
@@ -72,8 +73,16 @@ output_directory = './output_train'
 weight_decay = 1e-3
 save_path = './model'
 training = True
-epochs = 50
+epochs = 10
 epochs_per_batch = 1
+
+def dice_loss(y_pred, y_true):
+    smooth = 1.
+    y_true_f = K.flatten(y_true)
+    y_pred_f = K.flatten(y_pred)
+    intersection = K.sum(y_true_f * y_pred_f)
+    return 1 - ((2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth))
+
 
 def lr_scheduler(epoch):
     lr = lr_base * ((1 - float(epoch) / epochs) ** 0.9)
@@ -88,7 +97,7 @@ if __name__ == "__main__":
     lr_base = 0.01 * (float(batch_per_img * images_for_batch) / 16)
     optimizer = SGD(lr=lr_base, momentum=0.9)
 
-    model.compile(loss=losses.mean_squared_error, optimizer=optimizer)
+    model.compile(loss=losses.binary_crossentropy, optimizer=optimizer)
 
     if training:
         model_path = os.path.join(save_path, "model.json")
@@ -110,14 +119,18 @@ if __name__ == "__main__":
         model.save_weights(save_path + '/model.hdf5')
 
     else:
+        for layer in model.layers:
+            print(layer.get_weights())
+            print("--------------")
         x, y = prepare_batch('./input_test', './output_test', images_for_batch, batch_per_img)
         y_pred = model.predict(x)
         for xx, yy, zz in zip(x, y, y_pred):
             minn, maxx = np.percentile(np.squeeze(zz), [2, 98])
             print(minn, maxx)
+            cv2.imshow("y_pred_tt", np.where(np.squeeze(zz) > 0.1, 1.0, 0.0))
             zz = (zz - minn) / (maxx - minn)
             cv2.imshow("x", np.squeeze(xx))
             cv2.imshow("y_true", np.squeeze(yy))
             cv2.imshow("y_pred", np.squeeze(zz))
-            cv2.imshow("y_pred_t", np.where(np.squeeze(zz) > 0.75, 0.33, 0.0) + np.where(np.squeeze(zz) > 0.5, 0.33, 0.0) + np.where(np.squeeze(zz) > 0.25, 0.33, 0.0))
+            cv2.imshow("y_pred_t", np.where(np.squeeze(zz) > 0.5, 1.0, 0.0))
             cv2.waitKey(0)
