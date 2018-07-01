@@ -26,68 +26,54 @@ def AtrousFCN_Vgg16_16s(input_shape=None, weight_decay=0., batch_momentum=0.9, b
     # Block 3
     x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv1', kernel_regularizer=l2(weight_decay))(o2)
     x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv2', kernel_regularizer=l2(weight_decay))(x)
-    x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv3', kernel_regularizer=l2(weight_decay))(x)
     o3 = MaxPooling2D((2, 2), strides=(2, 2), name='block3_pool')(x)
 
     # Block 4
     x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv1', kernel_regularizer=l2(weight_decay))(o3)
     x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv2', kernel_regularizer=l2(weight_decay))(x)
-    x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv3', kernel_regularizer=l2(weight_decay))(x)
     x = MaxPooling2D((2, 2), strides=(2, 2), name='block4_pool')(x)
 
     # Block 5
-    x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv1', kernel_regularizer=l2(weight_decay))(x)
-    x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv2', kernel_regularizer=l2(weight_decay))(x)
-    x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv3', kernel_regularizer=l2(weight_decay))(x)
-
     # Convolutional layers transfered from fully-connected layers
-    x = Conv2D(2048, (7, 7), activation='relu', padding='same', dilation_rate=(2, 2),
-                      name='fc1', kernel_regularizer=l2(weight_decay))(x)
+    x = Conv2D(1024, (3, 3), activation='relu', padding='same', name='fc1', kernel_regularizer=l2(weight_decay))(x)
     x = Dropout(0.5)(x)
-    x = Conv2D(2048, (1, 1), activation='relu', padding='same', name='fc2', kernel_regularizer=l2(weight_decay))(x)
+    x = Conv2D(1024, (3, 3), activation='relu', padding='same', name='fc2', kernel_regularizer=l2(weight_decay))(x)
     x = Dropout(0.5)(x)
-
-    #classifying layer
-    out_4 = Conv2D(16, (1, 1), kernel_initializer='he_normal', activation='linear', padding='valid',
-                        strides=(1, 1), kernel_regularizer=l2(weight_decay))(x)
+    x = Conv2D(1024, (3, 3), activation='relu', padding='same', name='fc3', kernel_regularizer=l2(weight_decay))(x)
+    x = Dropout(0.5)(x)
+    out_4 = Conv2D(1024, (3, 3), activation='relu', padding='same', name='block_deconv11', kernel_regularizer=l2(weight_decay))(x)
 
     out_4 = BilinearUpSampling2D(target_size=(16, 16))(out_4)
 
-    out_3 = Conv2D(4, (1, 1), kernel_initializer='he_normal', activation='linear', padding='valid',
-                        strides=(1, 1), kernel_regularizer=l2(weight_decay))(o3)
+    out_3 = Concatenate()([o3, out_4])
 
-    out_3 = Concatenate()([out_3, out_4])
-
-    out_3 = Conv2D(16, (1, 1), kernel_initializer='he_normal', activation='linear', padding='valid',
-                        strides=(1, 1), kernel_regularizer=l2(weight_decay))(out_3)
+    out_3 = Conv2D(512, (3, 3), activation='relu', padding='same', name='block_deconv21', kernel_regularizer=l2(weight_decay))(out_3)
+    out_3 = Conv2D(512, (3, 3), activation='relu', padding='same', name='block_deconv22',
+                   kernel_regularizer=l2(weight_decay))(out_3)
 
     out_3 = BilinearUpSampling2D(target_size=(32, 32))(out_3)
 
-    out_2 = Conv2D(4, (1, 1), kernel_initializer='he_normal', activation='linear', padding='valid',
-                        strides=(1, 1), kernel_regularizer=l2(weight_decay))(o2)
+    out_2 = Concatenate()([o2, out_3])
 
-    out_2 = Concatenate()([out_2, out_3])
-
-    out_2 = Conv2D(16, (1, 1), kernel_initializer='he_normal', activation='linear', padding='valid',
-                        strides=(1, 1), kernel_regularizer=l2(weight_decay))(out_2)
+    out_2 = Conv2D(256, (3, 3), activation='relu', padding='same', name='block_deconv31', kernel_regularizer=l2(weight_decay))(out_2)
+    out_2 = Conv2D(256, (3, 3), activation='relu', padding='same', name='block_deconv32',
+                   kernel_regularizer=l2(weight_decay))(out_2)
 
     out_2 = BilinearUpSampling2D(target_size=(64, 64))(out_2)
 
-    out_1 = Conv2D(4, (1, 1), kernel_initializer='he_normal', activation='linear', padding='valid',
-                        strides=(1, 1), kernel_regularizer=l2(weight_decay))(o1)
+    out_1 = Concatenate()([o1, out_2])
 
-    out_1 = Concatenate()([out_1, out_2])
-
-    out_1 = Conv2D(16, (1, 1), kernel_initializer='he_normal', activation='linear', padding='valid',
-                        strides=(1, 1), kernel_regularizer=l2(weight_decay))(out_1)
+    out_1 = Conv2D(128, (3, 3), activation='relu', padding='same', name='block_deconv41', kernel_regularizer=l2(weight_decay))(out_1)
+    out_1 = Conv2D(128, (3, 3), activation='relu', padding='same', name='block_deconv42',
+                   kernel_regularizer=l2(weight_decay))(out_1)
 
     out_1 = BilinearUpSampling2D(target_size=(128, 128))(out_1)
 
-    out = Conv2D(classes, (1, 1), kernel_initializer='he_normal', activation='linear', padding='valid',
+    out = Conv2D(classes, (1, 1), kernel_initializer='he_normal', activation='sigmoid', padding='valid',
                         strides=(1, 1), kernel_regularizer=l2(weight_decay))(out_1)
 
     model = Model(img_input, out)
 
     weights_path = os.path.expanduser(os.path.join('./model/model.hdf5'))
-    model.load_weights(weights_path, by_name=True)
+    #model.load_weights(weights_path, by_name=True)
     return model

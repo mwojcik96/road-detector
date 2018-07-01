@@ -7,7 +7,7 @@ import numpy as np
 from keras import losses
 from keras.callbacks import LearningRateScheduler
 from keras.losses import binary_crossentropy
-from keras.optimizers import SGD
+from keras.optimizers import SGD, RMSprop
 import keras.backend as K
 
 from model import AtrousFCN_Vgg16_16s
@@ -42,17 +42,6 @@ def prepare_batch(input_dir, output_dir, img_for_batch=1, batch_p_img=1):
     return x, y
 
 
-def iou_lf(y_pred, y_true):
-    print(y_true, y_pred)
-    true_img = y_true > 0.5
-    pred_img = y_pred > 0.5
-    fin_img = true_img == pred_img
-
-    print(fin_img)
-
-    return 1 - cv2.countNonZero(fin_img) / (fin_img.shape[0] * fin_img.shape[1])
-
-
 def cropper(img_size, crop_size):
     x = random.randint(0, img_size - crop_size)
     y = random.randint(0, img_size - crop_size)
@@ -64,8 +53,8 @@ def file_list(in_directory, out_directory):
     output_list = [out_directory + "/" + file.split("/")[-1][:-1] for file in input_list]
     return input_list, output_list
 
-batch_per_img = 10
-images_for_batch = 10
+batch_per_img = 2
+images_for_batch = 720
 img_size = 1500
 input_size = 128  # FCN input element width and height
 input_directory = './input_train'
@@ -73,8 +62,9 @@ output_directory = './output_train'
 weight_decay = 1e-3
 save_path = './model'
 training = True
-epochs = 10
+epochs = 1
 epochs_per_batch = 1
+batch_size = 16
 
 def dice_loss(y_pred, y_true):
     smooth = 1.
@@ -82,6 +72,9 @@ def dice_loss(y_pred, y_true):
     y_pred_f = K.flatten(y_pred)
     intersection = K.sum(y_true_f * y_pred_f)
     return 1 - ((2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth))
+
+def loss_func(y_true, y_pred):
+    return dice_loss(y_true, y_pred) + binary_crossentropy(y_true, y_pred)
 
 
 def lr_scheduler(epoch):
@@ -94,10 +87,10 @@ if __name__ == "__main__":
 
     model = AtrousFCN_Vgg16_16s(input_shape=(input_size, input_size, 3), weight_decay=weight_decay, classes=1)
     print(model.summary())
-    lr_base = 0.01 * (float(batch_per_img * images_for_batch) / 16)
-    optimizer = SGD(lr=lr_base, momentum=0.9)
+    lr_base = 0.01 * (float(batch_size) / 16)
+    optimizer = RMSprop(lr=0.0001)
 
-    model.compile(loss=losses.binary_crossentropy, optimizer=optimizer)
+    model.compile(loss=loss_func, optimizer=optimizer)
 
     if training:
         model_path = os.path.join(save_path, "model.json")
@@ -114,7 +107,7 @@ if __name__ == "__main__":
         scheduler = LearningRateScheduler(lr_scheduler)
         callbacks = [scheduler]
 
-        model.fit(x, y, batch_size=8, epochs=epochs, callbacks=callbacks)
+        model.fit(x, y, batch_size=batch_size, epochs=epochs, callbacks=callbacks)
 
         model.save_weights(save_path + '/model.hdf5')
 
