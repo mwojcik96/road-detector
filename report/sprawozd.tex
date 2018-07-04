@@ -1,0 +1,71 @@
+%@descr: wzór sprawozdania, raportu lub pracy - nadaje się do przeróbek
+%@author: Maciej Komosiński
+
+\documentclass{article} 
+\usepackage{polski} %moze wymagac dokonfigurowania latexa, ale jest lepszy niż standardowy babel'owy [polish] 
+\usepackage[utf8]{inputenc} 
+\usepackage[OT4]{fontenc} 
+\usepackage{graphicx,color} %include pdf's (and png's for raster graphics... avoid raster graphics!) 
+\usepackage{url} 
+\usepackage[pdftex,hyperfootnotes=false,pdfborder={0 0 0}]{hyperref} %za wszystkimi pakietami; pdfborder nie wszedzie tak samo zaimplementowane bo specyfikacja nieprecyzyjna; pod miktex'em po prostu nie widac wtedy ramek
+\usepackage{float}
+
+\input{_ustawienia.tex}
+
+%\title{Sprawozdanie z laboratorium:\\Metaheurystyki i Obliczenia Inspirowane Biologicznie}
+%\author{}
+%\date{}
+
+
+\begin{document}
+
+\input{_tytulowa}
+
+
+\section{Wstęp}
+
+Zadaniem w niniejszym projekcie było stworzenie programu, który posłużyłby do rozwiązania problemu segmentacji semantycznej. Sam problem segmentacji polega na oddzieleniu od siebie obszarów obrazu, które stanowią odrębne obiekty. Do celu segmentacji wystarczy wykorzystać klasyczne metody przetwarzania obrazów, jak choćby wykrywanie krawędzi, czy też progowaniami na podstawie np. jasności pikseli. Zadanie to jest w większości przypadków dokładnie przestudiowane i rozwiązane, jednakże nie jest to najtrudniejszy możliwy problem, opierający się na rozpoznawaniu osobnych obiektów. Naturalnym rozwinięciem zagadnienia segmentacji jest segmentacja semantyczna. Polega ona na tym, by rozdzielać obiekty, będące w rzeczywistości innymi obiektami. Na przykład: rower składa się z dwóch kół, ramy, siodełka. System nie powinien oddzielać koła od tła, lecz wyodrębniać i nazywać rower jako całość.
+
+To zadanie do niedawna było poza zasięgiem programów komputerowych, jednak obecnie możliwe jest ich rozwiązanie poprzez zastosowanie głębokiego uczenia się. Powstało wiele architektur, pozwalających najpierw na rozwiązanie zadania klasyfikacji, czyli ,,czy na danym obrazku znajduje się pies?'', a następnie ,,gdzie na danym obrazku znajduje się pies?'' czyli właśnie zadanie segmentacji semantycznej. Zasadnicza różnica między powyższymi zadaniami polega na tym, że wyjściem sieci klasyfikującej obrazek jest najczęściej liczba, oznaczająca prawdopodobieństwo, lub etykieta binarna (prawda lub fałsz), natomiast w przypadku \textit{Fully Convolutional Network}, wyjściem jest cały obraz o takiej samej rozdzielczości jak obraz wejściowy, lecz już z naniesionymi barwami, gdzie każde skupisko odpowiada jednemu obiektowi. W tego typu zadaniu należy podać jako źródło wiedzy obrazek wejściowy, lecz oznaczony różnymi skupiskami kolorów, tak, jak twórcy systemu chcą, by ich sieć odpowiadała na dany obraz.
+
+\section{Eksperymenty}
+
+W trakcie tworzenia sieci najefektywniejszej, przeprowadzone zostało bardzo wiele eksperymentów. W tym rozwiązaniu autorzy skupili się na sieci \textit{Fully Convolutional}, której przykładowa architektura pokazana została na rysunku \ref{fig:fcn}.
+
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=0.8\textwidth]{fcn.png}
+\end{center}
+\caption{Przykładowa architektura sieci typu Fully Convolutional.}
+\label{fig:fcn}
+\end{figure}
+
+Sieć tego typu przyjmuje na wejściu obraz, następnie poprzez wielokrotne zastosowanie warstw splotowych, przeplatanych warstwami typu \textit{MaxPooling}, których zadaniem było zmniejszanie odpowiedzi kolejnych zestawów filtrów do coraz mniejszych macierzy. Następnie, po momencie największej kompresji informacji, następuje seria warstw \textit{deconvolutional}, których zadaniem jest powrotna konwersja skompresowanej informacji i odpowiedzi filtrów na obraz o wymiarze dokładnie takim samym jak obraz wejściowy. Funkcja straty ma za zadanie tak kierować nauką sieci, by odpowiedź jak najbardziej przypominała zaetykietowany obraz.
+
+\subsection{Użyte technologie}
+
+Do stworzenia architektury sieci, a także zaimplementowania preprocessingu, funkcji realizującej \textit{data augmentation}, czyli tworzenie syntetycznych przykładów z tych dostępnych posłużył język Python. Został wybrany ze względu na mnogość dostępnych frameworków do głębokiego uczenia się, a także ze względu na łatwość operowania na obrazach, macierzach z wykorzystaniem bibliotek numpy i scikit-image. Początkowo wybrany został framework TensorFlow, jako najpopularniejsze obecnie rozwiązanie, jednak został on porzucony na rzecz Kerasa, korzystającego pod spodem ze środowiska TensorFlow. Zmiana ta nastąpiła, gdyż interfejs programistyczny biblioteki Keras jest przyjaźniejszy niż ten dostępny przy TensorFlow, a do tego powstało bardzo wiele rozwiązań bazujących na tej bibliotece, co pozwalało na dogłębniejsze przestudiowanie potencjalnych architektur i ich skuteczności.
+
+\subsection{Preprocessing i zbiór danych}
+
+Zbiór danych jest dostępny w sieci. Jest to zbiór Massachusetts Roads Dataset, udostępniony przez Uniwersytet w Toronto. Składa się on z około 1100 zdjęć satelitarnych, wraz z odpowiadającą mu etykietą w postaci białych dróg i czarnego tła, czarnych budynków. Po przefiltrowaniu powyższego zbioru zdjęć, zostało 750 zdjęć w dobrej jakości, bez cenzury, z poprawnymi etykietami. Na tym zbiorze zdjęć został zbudowany właściwy zbiór danych. Obrazy dostępne w ramach tego zbioru nie mogły być bezpośrednio podane na wejście sieci, gdyż ich rozdzielczość była zbyt duża i sieć nie potrafiłaby w dopuszczalnym czasie nauczyć się niczego sensownego. W związku z tym została utworzona procedura, która z obrazu wejściowego wycinała losowe wycinki obrazu o rozmiarze 128x128 pikseli. Dzięki temu możliwe było utworzenie dużo większego zbioru danych niż 750 obrazów. Jednakże, przy niektórych eksperymentach problemem okazywała się pamięć i nie dało się dostarczyć tak dużej liczby obrazów wejściowych, jaką funkcja wycinająca była w stanie stworzyć.
+
+\subsection{Utworzone sieci neuronowe}
+
+\section{Wyniki}
+
+\section{Podsumowanie}
+
+\clearpage %pozwol LaTeX'owi umiescic zaległe rysunki od razu tutaj -- "uwalnia" nagromadzone zaległości, dzięki temu nie wylądują na końcu dokumentu
+
+
+
+
+
+%%%%%%%%%%%%%%%% literatura %%%%%%%%%%%%%%%%
+
+\bibliography{sprawozd}
+\bibliographystyle{plainurl}
+
+
+\end{document}
