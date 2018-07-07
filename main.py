@@ -116,7 +116,7 @@ if __name__ == "__main__":
 
     model = AtrousFCN_Vgg16_16s(input_shape=(input_size, input_size, 3), weight_decay=weight_decay, classes=1)
     print(model.summary())
-    lr_base = 0.015 * (float(batch_size) / 16)
+    lr_base = 0.01 * (float(batch_size) / 16)
     optimizer = SGD(lr=lr_base, momentum=0.9)
 
     model.compile(loss=dice_loss, optimizer=optimizer, metrics=[dice_coefff])
@@ -194,13 +194,13 @@ if __name__ == "__main__":
                     pred_counter = np.add(pred_counter, y_pred_count)
 
             print(pred_counter[120:160, 120:160])
+
             score = np.divide(pred_label, pred_counter)
-            print(score.shape)
-            score = cv2.morphologyEx(score, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_CROSS, (5, 5)))
-            print(score.shape)
-            _, score = cv2.threshold(score, 0.5, 1.0, cv2.THRESH_BINARY)
-            print(score.shape)
+
+            print("IOU:", np.sum(np.logical_and(score, image_out)) / np.sum(np.logical_or(score, image_out)))
             pyplot.imsave('./output_pred/' + in_img.split('/')[-1][:-5] + '.png', score, cmap='gray')
+
+            #score = cv2.morphologyEx(score, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_CROSS, (5, 5)))
             #cv2.imshow("y_true", image_out)
             #cv2.imshow("y_pred", score)
             #cv2.waitKey(0)
