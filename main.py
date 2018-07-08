@@ -1,17 +1,17 @@
 import glob
-import random
 import os
+import random
 
 import cv2
-import numpy as np
-from keras import losses
-from keras.callbacks import LearningRateScheduler
-from keras.losses import binary_crossentropy, mean_squared_error
-from keras.optimizers import SGD, RMSprop
 import keras.backend as K
+import numpy as np
+from keras.callbacks import LearningRateScheduler
+from keras.losses import mean_squared_error
+from keras.optimizers import SGD
 from matplotlib import pyplot
 
-from model import AtrousFCN_Vgg16_16s
+from model import FullyConvolutionalNetwork
+
 
 def prepare_batch(input_dir, output_dir, img_for_batch=1, batch_p_img=1):
     input_list, output_list = file_list(input_dir, output_dir)
@@ -32,17 +32,10 @@ def prepare_batch(input_dir, output_dir, img_for_batch=1, batch_p_img=1):
         image_out = cv2.imread(output_img_path, cv2.IMREAD_GRAYSCALE)
         image_out = cv2.normalize(image_out.astype('float'), None, 0.0, 1.0, cv2.NORM_MINMAX)
         image_out = np.expand_dims(image_out, axis=2)
-        #cv2.imshow("img", image_in)
-        #cv2.imshow("img2", image_out)
-        #cv2.waitKey(0)
-
         for i in range(batch_p_img):
             xl, xr, yl, yr = cropper(img_size, input_size)
             x = np.append(x, np.array([image_in[xl:xr, yl:yr]]), axis=0)
             y = np.append(y, np.array([image_out[xl:xr, yl:yr]]), axis=0)
-            #cv2.imshow("img", image_in[xl:xr, yl:yr])
-            #cv2.imshow("img2", image_out[xl:xr, yl:yr])
-            #cv2.waitKey(0)
     return x, y
 
 
@@ -114,7 +107,7 @@ def lr_scheduler(epoch):
 
 if __name__ == "__main__":
 
-    model = AtrousFCN_Vgg16_16s(input_shape=(input_size, input_size, 3), weight_decay=weight_decay, classes=1)
+    model = FullyConvolutionalNetwork(input_shape=(input_size, input_size, 3), weight_decay=weight_decay, classes=1)
     print(model.summary())
     lr_base = 0.01 * (float(batch_size) / 16)
     optimizer = SGD(lr=lr_base, momentum=0.9)

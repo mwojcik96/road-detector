@@ -6,7 +6,7 @@ from keras.models import *
 from BilinearUpSampling import BilinearUpSampling2D
 
 
-def AtrousFCN_Vgg16_16s(input_shape=None, weight_decay=0., batch_momentum=0.9, batch_shape=None, classes=21):
+def FullyConvolutionalNetwork(input_shape=None, weight_decay=0., batch_momentum=0.9, batch_shape=None, classes=21):
     if batch_shape:
         img_input = Input(batch_shape=batch_shape)
         image_size = batch_shape[1:3]
