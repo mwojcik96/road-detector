@@ -34,7 +34,7 @@ W trakcie tworzenia sieci najefektywniejszej, przeprowadzone zostało bardzo wie
 
 \begin{figure}[H]
 \begin{center}
-\includegraphics[width=0.8\textwidth]{fcn.png}
+\includegraphics[width=0.9\textwidth]{fcn.png}
 \end{center}
 \caption{Przykładowa architektura sieci typu Fully Convolutional.}
 \label{fig:fcn}
@@ -52,9 +52,45 @@ Zbiór danych jest dostępny w sieci. Jest to zbiór Massachusetts Roads Dataset
 
 \subsection{Utworzone sieci neuronowe}
 
+Eksperymenty rozpoczęły się od testowania możliwości wykorzystania istniejących i sprawdzonych architektur, osiągających bardzo dobre wyniki w podobnych problemach. Pierwsze testy przeprowadzono na sieciach zawierających pięć segmentów, na które składały się dwie lub trzy warstwy konwolucyjne i warstwy MaxPoolingu. Ze względu na 32-krotnie mniejszy rozmiar takiego obrazu, konieczne było zastosowanie na końcu warstwy realizującej operację Upsamplingu, która aproksymowała brakujące wartości pikseli, powstałe na skutek zwiększenia rozdzielczości obrazu. Rozwiązanie to było testowane z różnymi wartościami parametrów takich jak rozmiar batcha, współczynnik uczenia i liczności neuronów na poszczególnych warstwach. Modyfikacji ulegała również używana w celu nauki funkcja straty. Testy tak zaprojektowanych sieci dawały jednak bardzo słabe wyniki, prawdopodobnie ze względu na dużą utratę informacji i brak możliwości wyrażenia zdobytej wiedzy w wyniku operacji Upsamplingu.
+
+Kolejna próba oparta była o rozszerzenie pierwotnej koncepcji o stopniowe powiększanie rozdzielczości obrazu naprzemian ze splotami obrazów z tymi uzyskanymi na wcześniejszych warstwach konwolucyjnych. Ta koncepcja wydawała się bardziej skuteczna, jednak w procesie nauki postępy zachodziły bardzo powoli ze względu na bardzo dużą liczbę wag.
+
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=0.9\textwidth]{fcn_modified.png}
+\end{center}
+\caption{Zastosowana architektura sieci FCN}
+\label{fig:mod}
+\end{figure}
+
+Dobrym kompromisem pomiędzy powyższymi podejściami okazała się koncepcja wykorzystania wyników uzyskanych z każdego wcześniejszego segmentu, poddaniu ich konwolucji i Upsamplingowi do oczekiwanego, finalnego rozmiaru, a następnie konkatenację i splotu tak uzyskanych obrazów. Koncepcja widoczna jest na rysunku \ref{fig:mod}. Rozwiązanie to pozwalało na lepszą reprezentację uzyskanej wiedzy w połączeniu ze stosunkowo niskimi kosztami obliczeniowymi w procesie nauki, dzięki czemu sieć zaczęła osiągać dobre wyniki.
+
+Poczyniono również wiele prób wyboru odpowiedniej funkcji celu do postawionego problemu. Badania rozpoczęto od koncepcji opartej o minimalizację błędu średniokwadratowego,  a następnie próbie wykorzystania miary entropii krzyżowej, która jest popularną metodą w problemach segmentacji semantycznej zorientowanej na wiele klas. Ostatecznie zdecydowano się na Współczynnik Dice'a, wyrażający się wzorem
+
+\[ Dice(A, B) = \frac{2 \cdot C + 1}{A + B + 1}\]
+
+gdzie licznik to podwojona suma iloczynów wartości poszczególnych pikseli w dwóch obrazach, a mianownik jest sumą wartości pikseli w obu obrazach. W przypadku obrazów, których wartości pikseli wyrażają prawdopodobieństwo przynależności do danej klasy, współczynnik ten przyjmuje wartość 1 dla dwóch tożsamych obrazów i wartość 0 dla obrazów nie posiadających żadnej części wspólnej. Dodanie wartości 1 w liczniku i mianowniku nieznacznie modyfikuje wartość funkcji, ale pozwala zagwarantować niezerowy mianownik i pozostawić przeciwdziedzinę funkcji w zakresie $[0 ; 1]$. W takim wypadku konieczne jest zagwarantowanie również, że obraz wychodzący z sieci neuronowej będzie również wyrażał prawdopodobieństwo klasyfikacji i przyjmował wartości z takiego samego zakresu. W tym celu na końcu sieci dodano warstwę z sigmoidalną funkcją aktywacji, zaś zastosowaną funkcją celu była różnica pomiędzy wartością funkcji, a wartością 1, czyli idealnym odtworzeniem wzorca.
+
 \section{Wyniki}
 
+Po każdej epoce nauki, sieć była zapisywana do pliku, dzięki czemu w trakcie tego procesu mogliśmy na bieżąco monitorować jej wyniki na zbiorze walidującym i testowym. Co kilka epok (od 1 do 5) tworzony był nowy zbiór uczący, zawierający zwykle po 32 wycinki z 5 obrazów z dostępnego zbioru. Sieć była uczona w tej sposób przez około 1000 epok. Po procesie nauki, w celu zwiększenia jakości rozwiązania, podjęto próbę zastosowania postprocessingu, opartego o operacje morfologiczne i progowanie obrazu. Pomimo zastosowania kilku operacji otwarcia i domknięcia, na obrazach wyjściowych pozostawały niewielkie szumy. Aby je usunąć, każdy z obrazów był dzielony na spójne obszary. Następnie podjęto próbę mającą na celu maksymalizację współczynnika Intersection over Union, który jest bardzo podobny do współczynnika Dice'a, ale możliwy w zastosowaniu do dwóch binarnych obrazów, stąd konieczność wcześniejszego progowania. Poprzez testowanie kolejnych wartości progu rozmiaru spójnych obszarów, mierzonych w liczności pikseli, małe obszary były zerowane, co nieznacznie podniosło jakość ostatecznego rozwiązania.
+
+Do odtworzenia obrazu o pierwotnej rozdzielczości, konieczne było podzielenie go na mniejsze fragmenty, przetworzenie przez sieć, a następnie połączenie fragmentów w całość. Najlepiej sprawdziło się przesuwanie okna o rozmiarze obrazu wejściowego sieci (128 x 128 pikseli) na obrazie wejściowym o wartość parametru split, który ustalony został na 49, ze względu na co najmniej jednokrotną klasyfikację każdego z pikseli przy zachowaniu rozsądnego czasu przetwarzania. W przypadku kilkukrotnego poddaniu działaniu sieci danego piksela, wynik prawdopodobieństwa jego klasyfikacji był uśredniany. Po połączeniu ze sobą wszystkich fragmentów, obraz poddawany był wyżej opisanemu postprocessingowi.
+
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=0.9\textwidth]{example.png}
+\end{center}
+\caption{Obraz wejściowy, klasyfikacja wzorcowa po lewej i uzyskana przez algorytm po prawej stronie.}
+\label{fig:example}
+\end{figure}
+
+Ostatecznie, zastosowanie takiej procedury na całym zbiorze testowym skutkowało osiągnięciem wartości parametru IoU na poziomie ponad 0.47 przy porównaniu parami wzorców i obrazów wyjściowych po przetworzeniu przez sieć i postprocessingu. Przykładowy wynik działania sieci w porównaniu z oczekiwanym wynikiem i obrazem wejściowym widoczny jest na rysunku \ref{fig:example}.
+
 \section{Podsumowanie}
+
+Projekt pozwolił nam na pogłębienie wiedzy z zakresu budowy i działania sieci neuronowych, w szczególności w wersji konwolucyjnej. Poszerzyliśmy wiedzę z zakresu sieci sprawdzających się w zadaniach segmentacji semantycznej, a więc sieci typu Fully Convolutional Network. Nauczyliśmy się także konstruowania sieci przy pomocy narzędzi dostępnych w bibliotekach języka Python. Dowiedzieliśmy się w jaki sposób można projektować i modyfikować topologię, przygotować zbiór uczący i dostosować parametry takie jak funkcje aktywacji neuronów do wybranej funkcji celu.
 
 \clearpage %pozwol LaTeX'owi umiescic zaległe rysunki od razu tutaj -- "uwalnia" nagromadzone zaległości, dzięki temu nie wylądują na końcu dokumentu
 
